@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "789015993681",
+    "project_id": "moneyjar-5f5f1",
+    "storage_bucket": "moneyjar-5f5f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:789015993681:android:11f1d87014b03222dbc770",
+        "android_client_info": {
+          "package_name": "com.example.firstapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjpato-7nMlYuebryYrkobMUUyknYQOWo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
