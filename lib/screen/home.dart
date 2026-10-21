@@ -673,24 +673,29 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           : IndexedStack(index: _currentIndex, children: screens),
+      // 📌 SafeArea (เฉพาะด้านล่าง) กันแถบปุ่มระบบของมือถือไม่ให้ทับแถบเมนู
+      // สีพื้นอยู่ที่ Container นอกสุด จึงยังต่อเนื่องไปถึงขอบล่างของจอ
       bottomNavigationBar: Container(
         color: const Color(0xFFF3FAF4),
-        child: Container(
-          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8, top: 2),
-          height: 60,
-          decoration: BoxDecoration(
-            color: const Color(0xFFD7F5DC),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home_outlined, 0),
-              _buildNavItem(Icons.analytics_outlined, 1),
-              _buildNavItem(Icons.swap_horiz_outlined, 2),
-              _buildNavItem(Icons.layers_outlined, 3),
-              _buildNavItem(Icons.person_outline, 4),
-            ],
+        child: SafeArea(
+          top: false,
+          child: Container(
+            margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8, top: 2),
+            height: 60,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD7F5DC),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home_outlined, 0),
+                _buildNavItem(Icons.analytics_outlined, 1),
+                _buildNavItem(Icons.swap_horiz_outlined, 2),
+                _buildNavItem(Icons.layers_outlined, 3),
+                _buildNavItem(Icons.person_outline, 4),
+              ],
+            ),
           ),
         ),
       ),
