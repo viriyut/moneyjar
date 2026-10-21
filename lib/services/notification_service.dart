@@ -87,26 +87,37 @@ class NotificationService {
     const String body =
         'วันนี้คุณยังไม่ได้เพิ่มรายรับ-รายจ่ายเลย อย่าลืมเพิ่มรายรับ - รายจ่ายด้วยล่ะ !!!';
 
-    await _notificationsPlugin.zonedSchedule(
-      _dailyReminderId,
-      title,
-      body,
-      _nextInstanceOfNineAM(),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_reminder_channel_v2',
-          'เตือนบันทึกประจำวัน',
-          channelDescription: 'แจ้งเตือนให้บันทึกรายรับ-รายจ่ายทุกวันตอน 9 โมงเช้า',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(),
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'daily_reminder_channel_v2',
+        'เตือนบันทึกประจำวัน',
+        channelDescription: 'แจ้งเตือนให้บันทึกรายรับ-รายจ่ายทุกวันตอน 9 โมงเช้า',
+        importance: Importance.max,
+        priority: Priority.high,
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
+      iOS: DarwinNotificationDetails(),
     );
+
+    Future<void> schedule(AndroidScheduleMode mode) {
+      return _notificationsPlugin.zonedSchedule(
+        _dailyReminderId,
+        title,
+        body,
+        _nextInstanceOfNineAM(),
+        details,
+        androidScheduleMode: mode,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
+
+    try {
+      await schedule(AndroidScheduleMode.exactAllowWhileIdle);
+    } catch (_) {
+      // Android 12+ อาจไม่อนุญาตให้ตั้งเวลาแบบเป๊ะ (exact alarm) ถอยไปใช้แบบประมาณเวลาแทน
+      await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+    }
   }
 
   // 📌 ยกเลิกแจ้งเตือนรายวัน (ใช้ตอนผู้ใช้ปิดสวิตช์แจ้งเตือนในหน้าตั้งค่า)

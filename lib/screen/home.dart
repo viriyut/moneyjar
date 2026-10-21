@@ -199,16 +199,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 📌 เขียนธุรกรรมลง Firestore (ถ้าไม่ได้ login จะข้ามไป)
-  Future<void> _saveTransactionToFirestore(TransactionModel tx) async {
+  Future<void> _saveTransactionToFirestore(
+    TransactionModel tx,
+    String? id,
+  ) async {
     final uid = _uid;
-    if (uid == null) return;
+    if (uid == null || id == null) return;
 
     try {
       await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .collection('transactions')
-          .add({
+          .doc(id)
+          .set({
         'title': tx.title,
         'amount': tx.amount,
         'isIncome': tx.isIncome,
@@ -225,9 +229,72 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // 📌 ลบรายการ: เอาออกจากหน้าจอทันที แล้วลบเอกสารใน Firestore
+  Future<void> _deleteTransaction(Map<String, dynamic> item) async {
+    setState(() => _transactions.remove(item));
+
+    final uid = _uid;
+    final id = item['id'] as String?;
+    if (uid == null || id == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('transactions')
+          .doc(id)
+          .delete();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ลบรายการบนเซิร์ฟเวอร์ไม่สำเร็จ')),
+      );
+    }
+  }
+
+  // 📌 แก้ไขจำนวนเงินของรายการ: อัปเดตหน้าจอทันที แล้วอัปเดตเอกสารใน Firestore
+  Future<void> _updateTransactionAmount(
+    Map<String, dynamic> item,
+    double newAmount,
+  ) async {
+    final oldAmount = item['amount'];
+    setState(() => item['amount'] = newAmount);
+
+    final uid = _uid;
+    final id = item['id'] as String?;
+    if (uid == null || id == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('transactions')
+          .doc(id)
+          .update({'amount': newAmount});
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => item['amount'] = oldAmount); // คืนค่าเดิมถ้าบันทึกไม่สำเร็จ
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('แก้ไขรายการบนเซิร์ฟเวอร์ไม่สำเร็จ')),
+      );
+    }
+  }
+
   void _addTransactionFromModel(TransactionModel tx) {
+    // สร้างรหัสเอกสารล่วงหน้า เพื่อให้รายการที่เพิ่งเพิ่มลบ/แก้ไขได้ทันที
+    final uid = _uid;
+    final String? newId = uid == null
+        ? null
+        : FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('transactions')
+            .doc()
+            .id;
+
     setState(() {
       _transactions.insert(0, {
+        'id': newId,
         'title': tx.title,
         'amount': tx.amount,
         'dateTime': tx.dateTime,
@@ -239,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     // 📌 บันทึกลง Firestore จริง ผูกกับบัญชีที่ login อยู่ (uid)
-    _saveTransactionToFirestore(tx);
+    _saveTransactionToFirestore(tx, newId);
 
     // ========================================================
     // 🔔 1. แจ้งเตือน: ค่าใช้จ่ายจำเป็น (50%, 70%, 100%)
@@ -589,6 +656,8 @@ class _HomeScreenState extends State<HomeScreen> {
       TransactionScreen(
         transactions: _transactions,
         onAddTransaction: _addTransactionFromModel,
+        onDeleteTransaction: _deleteTransaction,
+        onEditTransaction: _updateTransactionAmount,
         onBack: _goToHome,
       ),
       CategoryScreen(onAddTransaction: _addTransactionFromModel, onBack: _goToHome),

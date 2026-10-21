@@ -8,7 +8,12 @@ import 'category.dart';
 class TransactionScreen extends StatefulWidget {
   final List<Map<String, dynamic>> transactions;
   final Function(TransactionModel) onAddTransaction;
-  final Function(int index)? onDeleteTransaction; // ปรับเพิ่ม: รองรับการลบรายการ
+  /// ลบรายการ (ส่งตัวรายการที่ต้องการลบเข้ามา)
+  final Function(Map<String, dynamic> item)? onDeleteTransaction;
+
+  /// แก้ไขจำนวนเงินของรายการ
+  final Function(Map<String, dynamic> item, double newAmount)?
+      onEditTransaction;
 
   /// เรียกตอนกดปุ่มย้อนกลับ ใช้สำหรับสลับกลับไปแท็บ "หน้าหลัก"
   /// (ถ้าไม่ส่งมา จะ fallback ไปใช้ Navigator.pop ตามปกติ)
@@ -19,6 +24,7 @@ class TransactionScreen extends StatefulWidget {
     required this.transactions,
     required this.onAddTransaction,
     this.onDeleteTransaction,
+    this.onEditTransaction,
     this.onBack,
   });
 
@@ -293,7 +299,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
                             // 📌 หัวข้อรายการทั้งหมด
                             const Padding(
-                              padding: EdgeInsets.only(top: 4, bottom: 4),
+                              padding: EdgeInsets.only(top: 4, bottom: 2),
                               child: Text(
                                 'รายการทั้งหมด',
                                 style: TextStyle(
@@ -303,16 +309,36 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                 ),
                               ),
                             ),
+                            if (widget.onEditTransaction != null ||
+                                widget.onDeleteTransaction != null)
+                              const Padding(
+                                padding: EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  'แตะที่รายการเพื่อแก้ไข · ปัดซ้ายเพื่อลบ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
 
                             // 📌 รายการธุรกรรมทีละรายการ
                             ...List.generate(widget.transactions.length, (
                               index,
                             ) {
                               final item = widget.transactions[index];
+                              final Widget tile = GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: widget.onEditTransaction == null
+                                    ? null
+                                    : () => _showEditDialog(item),
+                                child: _buildTransactionTile(item),
+                              );
                               if (widget.onDeleteTransaction != null) {
                                 return Dismissible(
-                                  key: UniqueKey(),
+                                  key: ObjectKey(item),
                                   direction: DismissDirection.endToStart,
+                                  confirmDismiss: (_) => _confirmDelete(item),
                                   background: Container(
                                     alignment: Alignment.centerRight,
                                     padding: const EdgeInsets.only(right: 20),
@@ -326,12 +352,12 @@ class _TransactionScreenState extends State<TransactionScreen> {
                                     ),
                                   ),
                                   onDismissed: (direction) {
-                                    widget.onDeleteTransaction!(index);
+                                    widget.onDeleteTransaction!(item);
                                   },
-                                  child: _buildTransactionTile(item),
+                                  child: tile,
                                 );
                               }
-                              return _buildTransactionTile(item);
+                              return tile;
                             }),
                           ],
                         ),
@@ -589,6 +615,121 @@ class _TransactionScreenState extends State<TransactionScreen> {
     );
   }
 
+  // 📌 หน้าต่างยืนยันก่อนลบ (คืน true ถ้ายืนยัน)
+  Future<bool> _confirmDelete(Map<String, dynamic> item) async {
+    final title = item['title'] as String? ?? 'รายการนี้';
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFDE8E8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: Color(0xFFEE4E4E),
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'ลบรายการ',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E3323),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'ต้องการลบ "$title" ใช่ไหม?\nลบแล้วกู้คืนไม่ได้',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: const BorderSide(color: Color(0xFF1E3323)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E3323),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: const Color(0xFFEE4E4E),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        'ลบ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    return result ?? false;
+  }
+
+  // 📌 หน้าต่างแก้ไขจำนวนเงิน (มีปุ่มลบรายการด้วย)
+  Future<void> _showEditDialog(Map<String, dynamic> item) async {
+    final result = await showDialog<_EditResult>(
+      context: context,
+      builder: (_) => _EditAmountDialog(
+        title: item['title'] as String? ?? 'รายการ',
+        initialAmount: (item['amount'] as num).toDouble(),
+        canDelete: widget.onDeleteTransaction != null,
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    if (result.delete) {
+      if (await _confirmDelete(item)) {
+        widget.onDeleteTransaction?.call(item);
+      }
+    } else if (result.amount != null) {
+      widget.onEditTransaction?.call(item, result.amount!);
+    }
+  }
+
   Widget _buildTransactionTile(Map<String, dynamic> item) {
     final double amount = (item['amount'] as num).toDouble();
     final bool isIncome = item['isIncome'] == true;
@@ -642,6 +783,158 @@ class _TransactionScreenState extends State<TransactionScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+// ============================================================
+// 📌 หน้าต่างแก้ไขจำนวนเงินของรายการ
+// ============================================================
+class _EditResult {
+  final bool delete;
+  final double? amount;
+  const _EditResult.save(this.amount) : delete = false;
+  const _EditResult.delete()
+      : delete = true,
+        amount = null;
+}
+
+class _EditAmountDialog extends StatefulWidget {
+  final String title;
+  final double initialAmount;
+  final bool canDelete;
+
+  const _EditAmountDialog({
+    required this.title,
+    required this.initialAmount,
+    required this.canDelete,
+  });
+
+  @override
+  State<_EditAmountDialog> createState() => _EditAmountDialogState();
+}
+
+class _EditAmountDialogState extends State<_EditAmountDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final a = widget.initialAmount;
+    _controller = TextEditingController(
+      text: a == a.roundToDouble() ? a.toStringAsFixed(0) : a.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final value = double.tryParse(_controller.text.trim());
+    if (value == null || value <= 0) {
+      setState(() => _error = 'กรุณากรอกจำนวนเงินที่มากกว่า 0');
+      return;
+    }
+    Navigator.pop(context, _EditResult.save(value));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'แก้ไข ${widget.title}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E3323),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'จำนวนเงิน (THB)',
+                  errorText: _error,
+                  filled: true,
+                  fillColor: const Color(0xFFE8F5E9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (_) {
+                  if (_error != null) setState(() => _error = null);
+                },
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFA2E0B2),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: _save,
+                      child: const Text(
+                        'บันทึก',
+                        style: TextStyle(
+                          color: Color(0xFF1E3323),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (widget.canDelete)
+                TextButton.icon(
+                  onPressed: () =>
+                      Navigator.pop(context, const _EditResult.delete()),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: Color(0xFFEE4E4E),
+                  ),
+                  label: const Text(
+                    'ลบรายการนี้',
+                    style: TextStyle(color: Color(0xFFEE4E4E)),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,22 +1,36 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // 📌 เพิ่ม import นี้
-import 'firebase_options.dart'; // 📌 เพิ่ม import ไฟล์คอนฟิกที่ flutterfire configure สร้างให้
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firstapp/firebase_options.dart';
 import 'package:firstapp/screen/started.dart';
+import 'package:flutter/material.dart';
 import 'package:firstapp/services/notification_service.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 📌 เรียกใช้งาน Firebase เป็นอันดับแรก
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // ต้อง initialize Firebase ก่อนสิ่งอื่นใด
+  // ถ้าพลาด ให้แอปยังเปิดขึ้นมาได้ (ไม่ค้างหน้าเปิดแอป) แล้วค่อยดู error ใน log
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase init failed: $e');
+  }
 
-  // การตั้งค่าแจ้งเตือนเดิมของคุณ
-  await NotificationService.init();
-  await NotificationService.scheduleDaily9AMNotification();
-
+  // 📌 เปิดแอปก่อนเสมอ แล้วค่อยตั้งแจ้งเตือนทีหลัง
+  // เดิมตั้งแจ้งเตือนก่อน runApp ถ้า error แอปจะค้างหน้าเปิดแอปตลอด
   runApp(const MyApp());
+  _setupNotifications();
+}
+
+Future<void> _setupNotifications() async {
+  try {
+    await NotificationService.init();
+    await NotificationService.scheduleDaily9AMNotification();
+  } catch (e) {
+    // แจ้งเตือนพัง ไม่ควรทำให้ทั้งแอปใช้ไม่ได้
+    debugPrint('Notification setup failed: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -25,12 +39,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'MoneyJar',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         fontFamily: 'Kanit',
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: StartedScreen(),
+      home: const StartedScreen(),
     );
   }
 }
