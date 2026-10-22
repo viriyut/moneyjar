@@ -37,7 +37,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     {'name': 'ความบันเทิง', 'icon': Icons.confirmation_number_outlined},
     {'name': 'ท่องเที่ยว', 'icon': Icons.flight_takeoff_outlined},
     {'name': 'สัตว์เลี้ยง', 'icon': Icons.pets},
-    {'name': 'เกม', 'icon': Icons.sports_esports},
+    {'name': 'ของขวัญ', 'icon': Icons.card_giftcard},
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
   ];
 
@@ -142,6 +142,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     required bool isIncome,
   }) {
     final TextEditingController amountController = TextEditingController();
+    final TextEditingController noteController = TextEditingController();
     showDialog(
       context: dialogContext,
       builder: (ctx) {
@@ -186,7 +187,23 @@ class _CategoryScreenState extends State<CategoryScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
+                  // 📌 รายละเอียดเพิ่มเติม (ไม่บังคับ)
+                  TextField(
+                    controller: noteController,
+                    maxLength: 60,
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(
+                      hintText: 'รายละเอียด (ไม่บังคับ) เช่น ข้าวเหนียวหมูปิ้ง',
+                      filled: true,
+                      fillColor: const Color(0xFFE8F5E9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       Expanded(
@@ -218,6 +235,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                 icon: icon,
                                 iconBgColor: cardColor,
                                 isIncome: isIncome,
+                                note: noteController.text.trim(),
                               );
 
                               Navigator.of(ctx).pop();

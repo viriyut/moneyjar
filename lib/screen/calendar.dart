@@ -504,6 +504,13 @@ class _CalendarPageState extends State<CalendarPage> {
                     color: Color(0xFF1E3323),
                   ),
                 ),
+                if ((item['note'] as String?)?.isNotEmpty ?? false)
+                  Text(
+                    item['note'] as String,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 Text(
                   _formatDateTime(dt),
                   style: const TextStyle(

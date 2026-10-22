@@ -11,8 +11,8 @@ class TransactionScreen extends StatefulWidget {
   /// ลบรายการ (ส่งตัวรายการที่ต้องการลบเข้ามา)
   final Function(Map<String, dynamic> item)? onDeleteTransaction;
 
-  /// แก้ไขจำนวนเงินของรายการ
-  final Function(Map<String, dynamic> item, double newAmount)?
+  /// แก้ไขจำนวนเงินและรายละเอียดของรายการ
+  final Function(Map<String, dynamic> item, double newAmount, String newNote)?
       onEditTransaction;
 
   /// เรียกตอนกดปุ่มย้อนกลับ ใช้สำหรับสลับกลับไปแท็บ "หน้าหลัก"
@@ -716,6 +716,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
       builder: (_) => _EditAmountDialog(
         title: item['title'] as String? ?? 'รายการ',
         initialAmount: (item['amount'] as num).toDouble(),
+        initialNote: item['note'] as String? ?? '',
         canDelete: widget.onDeleteTransaction != null,
       ),
     );
@@ -726,7 +727,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
         widget.onDeleteTransaction?.call(item);
       }
     } else if (result.amount != null) {
-      widget.onEditTransaction?.call(item, result.amount!);
+      widget.onEditTransaction?.call(item, result.amount!, result.note);
     }
   }
 
@@ -764,6 +765,13 @@ class _TransactionScreenState extends State<TransactionScreen> {
                     color: Color(0xFF1E3323),
                   ),
                 ),
+                if ((item['note'] as String?)?.isNotEmpty ?? false)
+                  Text(
+                    item['note'] as String,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 Text(
                   _formatDateTime(item['dateTime'] as DateTime? ?? DateTime.now()),
                   style: const TextStyle(
@@ -795,20 +803,24 @@ class _TransactionScreenState extends State<TransactionScreen> {
 class _EditResult {
   final bool delete;
   final double? amount;
-  const _EditResult.save(this.amount) : delete = false;
+  final String note;
+  const _EditResult.save(this.amount, this.note) : delete = false;
   const _EditResult.delete()
       : delete = true,
-        amount = null;
+        amount = null,
+        note = '';
 }
 
 class _EditAmountDialog extends StatefulWidget {
   final String title;
   final double initialAmount;
+  final String initialNote;
   final bool canDelete;
 
   const _EditAmountDialog({
     required this.title,
     required this.initialAmount,
+    required this.initialNote,
     required this.canDelete,
   });
 
@@ -818,6 +830,7 @@ class _EditAmountDialog extends StatefulWidget {
 
 class _EditAmountDialogState extends State<_EditAmountDialog> {
   late final TextEditingController _controller;
+  late final TextEditingController _noteController;
   String? _error;
 
   @override
@@ -827,11 +840,13 @@ class _EditAmountDialogState extends State<_EditAmountDialog> {
     _controller = TextEditingController(
       text: a == a.roundToDouble() ? a.toStringAsFixed(0) : a.toString(),
     );
+    _noteController = TextEditingController(text: widget.initialNote);
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -841,7 +856,10 @@ class _EditAmountDialogState extends State<_EditAmountDialog> {
       setState(() => _error = 'กรุณากรอกจำนวนเงินที่มากกว่า 0');
       return;
     }
-    Navigator.pop(context, _EditResult.save(value));
+    Navigator.pop(
+      context,
+      _EditResult.save(value, _noteController.text.trim()),
+    );
   }
 
   @override
@@ -885,7 +903,21 @@ class _EditAmountDialogState extends State<_EditAmountDialog> {
                   if (_error != null) setState(() => _error = null);
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _noteController,
+                maxLength: 60,
+                decoration: InputDecoration(
+                  hintText: 'รายละเอียด (ไม่บังคับ)',
+                  filled: true,
+                  fillColor: const Color(0xFFE8F5E9),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(

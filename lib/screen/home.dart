@@ -179,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic> _decodeTransaction(String id, Map<String, dynamic> data) {
     return {
       'id': id,
+      'note': data['note'] as String? ?? '',
       'title': data['title'] as String? ?? 'ไม่มีชื่อรายการ',
       'amount': (data['amount'] as num?)?.toDouble() ?? 0.0,
       'isIncome': data['isIncome'] as bool? ?? false,
@@ -249,6 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
         'iconCodePoint': tx.icon.codePoint,
         'iconFontFamily': tx.icon.fontFamily ?? 'MaterialIcons',
         'iconColorValue': tx.iconBgColor.toARGB32(),
+        'note': tx.note,
       });
     } catch (e) {
       if (!mounted) return;
@@ -281,13 +283,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 📌 แก้ไขจำนวนเงินของรายการ: อัปเดตหน้าจอทันที แล้วอัปเดตเอกสารใน Firestore
-  Future<void> _updateTransactionAmount(
+  // 📌 แก้ไขจำนวนเงิน/รายละเอียดของรายการ: อัปเดตหน้าจอทันที แล้วอัปเดตเอกสารใน Firestore
+  Future<void> _updateTransaction(
     Map<String, dynamic> item,
     double newAmount,
+    String newNote,
   ) async {
     final oldAmount = item['amount'];
-    setState(() => item['amount'] = newAmount);
+    final oldNote = item['note'];
+    setState(() {
+      item['amount'] = newAmount;
+      item['note'] = newNote;
+    });
 
     final uid = _uid;
     final id = item['id'] as String?;
@@ -299,10 +306,13 @@ class _HomeScreenState extends State<HomeScreen> {
           .doc(uid)
           .collection('transactions')
           .doc(id)
-          .update({'amount': newAmount});
+          .update({'amount': newAmount, 'note': newNote});
     } catch (e) {
       if (!mounted) return;
-      setState(() => item['amount'] = oldAmount); // คืนค่าเดิมถ้าบันทึกไม่สำเร็จ
+      setState(() {
+        item['amount'] = oldAmount; // คืนค่าเดิมถ้าบันทึกไม่สำเร็จ
+        item['note'] = oldNote;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('แก้ไขรายการบนเซิร์ฟเวอร์ไม่สำเร็จ')),
       );
@@ -324,6 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _transactions.insert(0, {
         'id': newId,
+        'note': tx.note,
         'title': tx.title,
         'amount': tx.amount,
         'dateTime': tx.dateTime,
@@ -686,7 +697,7 @@ class _HomeScreenState extends State<HomeScreen> {
         transactions: _transactions,
         onAddTransaction: _addTransactionFromModel,
         onDeleteTransaction: _deleteTransaction,
-        onEditTransaction: _updateTransactionAmount,
+        onEditTransaction: _updateTransaction,
         onBack: _goToHome,
       ),
       CategoryScreen(onAddTransaction: _addTransactionFromModel, onBack: _goToHome),
