@@ -101,8 +101,13 @@ class ProfileScreen extends StatelessWidget {
                           ),
                           elevation: 0,
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(ctx); // ปิด Dialog
+
+                          // ออกจากระบบ Firebase จริงๆ (ไม่งั้นเปิดแอปใหม่จะเข้าบัญชีเดิมอัตโนมัติ)
+                          await FirebaseAuth.instance.signOut();
+                          profileImageNotifier.value = null;
+                          if (!context.mounted) return;
 
                           // เคลียร์หน้าก่อนหน้าทั้งหมด แล้วเด้งกลับไปหน้า Login
                           Navigator.pushAndRemoveUntil(

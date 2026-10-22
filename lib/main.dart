@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firstapp/firebase_options.dart';
+import 'package:firstapp/screen/home.dart';
 import 'package:firstapp/screen/started.dart';
 import 'package:flutter/material.dart';
 import 'package:firstapp/services/notification_service.dart';
@@ -45,7 +47,38 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Kanit',
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const StartedScreen(),
+      home: const AuthGate(),
+    );
+  }
+}
+
+/// 📌 เช็คตอนเปิดแอปว่าเคยล็อกอินค้างไว้ไหม
+/// - ล็อกอินอยู่ -> เข้าหน้าหลักเลย (ไม่ต้องล็อกอินใหม่ทุกครั้ง)
+/// - ยังไม่ล็อกอิน -> ไปหน้าเริ่มต้น
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // ถ้า Firebase เริ่มต้นไม่สำเร็จ ให้ไปหน้าเริ่มต้นตามปกติ (ไม่เรียก FirebaseAuth)
+    if (Firebase.apps.isEmpty) return const StartedScreen();
+
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFA2E0B2),
+            body: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1E3323)),
+              ),
+            ),
+          );
+        }
+        if (snapshot.hasData) return const HomeScreen();
+        return const StartedScreen();
+      },
     );
   }
 }

@@ -49,6 +49,38 @@ const List<String> kPersonalKeywords = [
 
 const List<String> kSavingsKeywords = ['เงินออม', 'ลงทุน', 'กองทุน', 'ออม'];
 
+// ============================================================
+// 📌 ไอคอนที่ใช้ในหมวดหมู่ทั้งหมด (ต้องเป็น const เพื่อให้ build release ตัดไอคอนที่ไม่ใช้ออกได้)
+// ถ้าเพิ่มไอคอนหมวดหมู่ใหม่ใน category.dart ให้เพิ่มในลิสต์นี้ด้วย
+// ไม่งั้นรายการที่โหลดจาก Firestore จะแสดงเป็นไอคอนทั่วไปแทน
+// ============================================================
+final Map<int, IconData> _knownIcons = {
+  for (final icon in const <IconData>[
+    Icons.restaurant_menu,
+    Icons.home_outlined,
+    Icons.directions_bus,
+    Icons.medical_services_outlined,
+    Icons.shopping_bag_outlined,
+    Icons.credit_card_outlined,
+    Icons.local_cafe_outlined,
+    Icons.checkroom_outlined,
+    Icons.confirmation_number_outlined,
+    Icons.flight_takeoff_outlined,
+    Icons.pets,
+    Icons.card_giftcard,
+    Icons.payments_outlined,
+    Icons.savings_outlined,
+    Icons.category_outlined,
+    Icons.add,
+  ])
+    icon.codePoint: icon,
+};
+
+IconData _iconFromCodePoint(int? codePoint) {
+  if (codePoint == null) return Icons.category_outlined;
+  return _knownIcons[codePoint] ?? Icons.category_outlined;
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -153,10 +185,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'dateTime': data['dateTime'] is Timestamp
           ? (data['dateTime'] as Timestamp).toDate()
           : DateTime.now(),
-      'icon': IconData(
-        data['iconCodePoint'] as int? ?? Icons.category.codePoint,
-        fontFamily: data['iconFontFamily'] as String? ?? 'MaterialIcons',
-      ),
+      'icon': _iconFromCodePoint(data['iconCodePoint'] as int?),
       'iconBgColor': Color(data['iconColorValue'] as int? ?? Colors.grey.toARGB32()),
     };
   }
