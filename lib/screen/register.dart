@@ -130,10 +130,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Column(
                     children: [
                       buildInput(
-                        label: "ชื่อ-สกุล",
+                        label: "ชื่อผู้ใช้",
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'กรุณากรอกชื่อ-สกุล';
+                            return 'กรุณากรอกชื่อผู้ใช้';
                           }
                           return null;
                         },

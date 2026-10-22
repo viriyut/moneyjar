@@ -410,9 +410,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     const SizedBox(height: 20),
 
-                    // ฟิลด์ ชื่อ-สกุล
+                    // ฟิลด์ ชื่อ
                     _buildInputField(
-                      label: 'ชื่อ-สกุล',
+                      label: 'ชื่อผู้ใช้',
                       controller: _nameController,
                     ),
 
