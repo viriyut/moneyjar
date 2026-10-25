@@ -34,13 +34,23 @@ class TransactionScreen extends StatefulWidget {
 
 class _TransactionScreenState extends State<TransactionScreen> {
   // 📌 คำนวณรายรับจาก widget.transactions
+  // เงินออมแยกคิดต่างหาก ไม่รวมในรายรับ/รายจ่าย/ยอดคงเหลือ
+  bool _isSavings(Map<String, dynamic> t) {
+    final title = t['title'] as String? ?? '';
+    return kSavingsKeywords.any((kw) => title.contains(kw));
+  }
+
+  double get totalSavings => widget.transactions
+      .where(_isSavings)
+      .fold(0.0, (sum, item) => sum + ((item['amount'] as num).toDouble()));
+
   double get totalIncome => widget.transactions
-      .where((t) => t['isIncome'] == true)
+      .where((t) => t['isIncome'] == true && !_isSavings(t))
       .fold(0.0, (sum, item) => sum + ((item['amount'] as num).toDouble()));
 
   // 📌 คำนวณรายจ่ายจาก widget.transactions
   double get totalExpense => widget.transactions
-      .where((t) => t['isIncome'] == false)
+      .where((t) => t['isIncome'] == false && !_isSavings(t))
       .fold(0.0, (sum, item) => sum + ((item['amount'] as num).toDouble()));
 
   // 📌 จำนวนครั้งที่จ่ายเงินทั้งหมด
@@ -259,6 +269,16 @@ class _TransactionScreenState extends State<TransactionScreen> {
                               Icons.south_east,
                               const Color(0xFFFFCDD2),
                               const Color(0xFFE57373),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildSummaryCard(
+                              'เงินออม',
+                              '${totalSavings.toStringAsFixed(2)} THB',
+                              Icons.savings_outlined,
+                              const Color(0xFFD6E8FF),
+                              const Color(0xFF3B97FF),
                             ),
                           ),
                         ],
@@ -734,6 +754,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
   Widget _buildTransactionTile(Map<String, dynamic> item) {
     final double amount = (item['amount'] as num).toDouble();
     final bool isIncome = item['isIncome'] == true;
+    final bool isSaving = _isSavings(item);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -783,11 +804,13 @@ class _TransactionScreenState extends State<TransactionScreen> {
             ),
           ),
           Text(
-            '${isIncome ? '+' : '-'}${amount.toStringAsFixed(2)} THB',
+            '${isSaving ? '' : (isIncome ? '+' : '-')}${amount.toStringAsFixed(2)} THB',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: isIncome ? const Color(0xFF2E7D32) : const Color(0xFFEF5350),
+              color: isSaving
+                  ? const Color(0xFF3B97FF)
+                  : (isIncome ? const Color(0xFF2E7D32) : const Color(0xFFEF5350)),
             ),
           ),
         ],

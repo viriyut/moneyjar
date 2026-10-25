@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firstapp/screen/edit_profile_screen.dart' show profileImageNotifier;
 import 'package:firstapp/screen/notification.dart';
 import 'package:firstapp/screen/started.dart';
+import 'package:firstapp/screen/tutorial.dart';
 import 'package:firstapp/services/app_setting.dart';
 import 'package:firstapp/services/notification_service.dart';
 
@@ -619,6 +620,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         onTap: () =>
                             _setNotificationEnabled(!_notificationEnabled),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // วิธีใช้งานแอป (เปิดดู tutorial ซ้ำได้)
+                      _buildSettingItem(
+                        icon: Icons.help_outline,
+                        title: 'วิธีใช้งานแอป',
+                        trailing: Icon(
+                          Icons.chevron_right,
+                          color: Colors.grey[400],
+                          size: 24,
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TutorialScreen(),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
 

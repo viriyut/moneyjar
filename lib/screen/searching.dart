@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firstapp/screen/home.dart' show kSavingsKeywords;
 import 'package:firstapp/screen/notification.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -25,17 +26,23 @@ class _SearchScreenState extends State<SearchScreen> {
     'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
   ];
 
-  bool? _selectedIsIncome; // null = ทั้งหมด, true = รายรับ, false = รายจ่าย
+  String? _selectedType; // null = ทั้งหมด, 'income' = รายรับ, 'expense' = รายจ่าย, 'saving' = เงินออม
   DateTime? _selectedDate; // null = ทุกวัน
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
+  // 📌 แยกประเภทของรายการ: เงินออมไม่นับเป็นรายรับ/รายจ่าย
+  String _typeOf(Map<String, dynamic> tx) {
+    final title = tx['title'] as String? ?? '';
+    if (kSavingsKeywords.any((kw) => title.contains(kw))) return 'saving';
+    return tx['isIncome'] == true ? 'income' : 'expense';
+  }
+
   // 📌 ผลลัพธ์คำนวณสดจากตัวกรองปัจจุบัน เปลี่ยนประเภท/วันที่แล้วอัปเดตทันที ไม่ต้องกดค้นหา
   List<Map<String, dynamic>> get _results {
     return widget.transactions.where((tx) {
-      final matchesType =
-          _selectedIsIncome == null || tx['isIncome'] == _selectedIsIncome;
+      final matchesType = _selectedType == null || _typeOf(tx) == _selectedType;
       final DateTime? txDate = tx['dateTime'] as DateTime?;
       final matchesDate = _selectedDate == null ||
           (txDate != null && _isSameDay(txDate, _selectedDate!));
@@ -182,21 +189,26 @@ class _SearchScreenState extends State<SearchScreen> {
                           children: [
                             _buildTypePill(
                               label: 'ทั้งหมด',
-                              selected: _selectedIsIncome == null,
-                              onTap: () =>
-                                  setState(() => _selectedIsIncome = null),
+                              selected: _selectedType == null,
+                              onTap: () => setState(() => _selectedType = null),
                             ),
                             _buildTypePill(
                               label: 'รายรับ',
-                              selected: _selectedIsIncome == true,
+                              selected: _selectedType == 'income',
                               onTap: () =>
-                                  setState(() => _selectedIsIncome = true),
+                                  setState(() => _selectedType = 'income'),
                             ),
                             _buildTypePill(
                               label: 'รายจ่าย',
-                              selected: _selectedIsIncome == false,
+                              selected: _selectedType == 'expense',
                               onTap: () =>
-                                  setState(() => _selectedIsIncome = false),
+                                  setState(() => _selectedType = 'expense'),
+                            ),
+                            _buildTypePill(
+                              label: 'เงินออม',
+                              selected: _selectedType == 'saving',
+                              onTap: () =>
+                                  setState(() => _selectedType = 'saving'),
                             ),
                           ],
                         ),
@@ -337,6 +349,9 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildResultTile(Map<String, dynamic> item) {
     final double amount = (item['amount'] as num).toDouble();
     final bool isIncome = item['isIncome'] == true;
+    final bool isSaving = kSavingsKeywords.any(
+      (kw) => ((item['title'] as String?) ?? '').contains(kw),
+    );
     final DateTime dt = item['dateTime'] as DateTime? ?? DateTime.now();
 
     return Padding(
@@ -384,11 +399,11 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           Text(
-            '${isIncome ? '+' : '-'}${amount.toStringAsFixed(2)} THB',
+            '${isSaving ? '' : (isIncome ? '+' : '-')}${amount.toStringAsFixed(2)} THB',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: isIncome ? const Color(0xFF2E7D32) : const Color(0xFFEF5350),
+              color: isSaving ? const Color(0xFF3B97FF) : (isIncome ? const Color(0xFF2E7D32) : const Color(0xFFEF5350)),
             ),
           ),
         ],

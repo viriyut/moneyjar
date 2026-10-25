@@ -12,6 +12,7 @@ import 'package:firstapp/screen/transaction_model.dart';
 
 // 📌 นำเข้าไฟล์ Notification และ NotificationService
 import 'package:firstapp/screen/notification.dart';
+import 'package:firstapp/screen/tutorial.dart';
 import 'package:firstapp/services/app_setting.dart';
 import 'package:firstapp/services/notification_service.dart';
 
@@ -34,17 +35,25 @@ const List<String> kEssentialKeywords = [
   'ไฟ',
   'บ้าน',
   'พยาบาล',
+  'ผ่อน',
+  'ประกัน',
+  'เช่า',
+  'เน็ต',
 ];
 
 const List<String> kPersonalKeywords = [
-  'คาเฟ่',
-  'ชาไข่มุก',
+  'เครื่องดื่ม',
+  'ขนม',
   'ช้อปปิ้ง',
   'ความบันเทิง',
   'ท่องเที่ยว',
   'ส่วนตัว',
   'เกม',
   'สัตว์เลี้ยง',
+  'ทำบุญ',
+  'ปาร์ตี้',
+  'กินเลี้ยง',
+  'ของขวัญ',
 ];
 
 const List<String> kSavingsKeywords = ['เงินออม', 'ลงทุน', 'กองทุน', 'ออม'];
@@ -72,6 +81,14 @@ final Map<int, IconData> _knownIcons = {
     Icons.savings_outlined,
     Icons.category_outlined,
     Icons.add,
+    Icons.receipt_long_outlined,
+    Icons.directions_car_outlined,
+    Icons.verified_user_outlined,
+    Icons.volunteer_activism_outlined,
+    Icons.work_outline,
+    Icons.trending_up,
+    Icons.emoji_events_outlined,
+    Icons.account_balance_outlined,
   ])
     icon.codePoint: icon,
 };
@@ -100,6 +117,8 @@ class _HomeScreenState extends State<HomeScreen> {
   double _essentialPct = 50.0; // ค่าใช้จ่ายจำเป็น
   double _personalPct = 30.0; // ค่าใช้จ่ายส่วนตัว
   double _savingsPct = 20.0; // เงินออม
+
+  bool _tutorialChecked = false; // เช็คว่าต้องเปิด tutorial ครั้งแรกหรือยัง (เช็คครั้งเดียวต่อการเปิดหน้า)
 
   StreamSubscription<QuerySnapshot>? _transactionsSub;
   StreamSubscription<DocumentSnapshot>? _userDocSub;
@@ -158,6 +177,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _userDocSub = userDoc.snapshots().listen((doc) {
       final data = doc.data();
       if (data == null || !mounted) return;
+
+      // 📌 ผู้ใช้ที่ยังไม่เคยดู tutorial -> เปิดให้ดูอัตโนมัติครั้งเดียว
+      if (!_tutorialChecked) {
+        _tutorialChecked = true;
+        if (data['tutorialSeen'] != true) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _openTutorial());
+        }
+      }
+
       // สถานะเปิด/ปิดแจ้งเตือนที่ผู้ใช้ตั้งไว้ (ถ้ายังไม่เคยตั้ง = เปิด)
       final notificationsEnabled = data['notificationsEnabled'] as bool? ?? true;
       notificationsEnabledNotifier.value = notificationsEnabled;
@@ -172,6 +200,23 @@ class _HomeScreenState extends State<HomeScreen> {
         _savingsPct = (data['savingsPct'] as num?)?.toDouble() ?? _savingsPct;
       });
     });
+  }
+
+  // 📌 เปิดหน้า tutorial แล้วจดไว้ใน Firestore ว่าดูแล้ว (ครั้งหน้าไม่เด้งอีก)
+  Future<void> _openTutorial() async {
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TutorialScreen()),
+    );
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .set({'tutorialSeen': true}, SetOptions(merge: true));
+    } catch (_) {}
   }
 
   // 📌 แปลงข้อมูลดิบจาก Firestore กลับเป็นรูปแบบที่หน้าจออื่นในแอปใช้อยู่
@@ -194,6 +239,9 @@ class _HomeScreenState extends State<HomeScreen> {
   double get _totalBalance {
     double total = 0.0;
     for (var tx in _transactions) {
+      // เงินออมไม่นับรวมในยอดคงเหลือ
+      final title = tx['title'] as String? ?? '';
+      if (kSavingsKeywords.any((kw) => title.contains(kw))) continue;
       if (tx['isIncome'] == true) {
         total += (tx['amount'] as double);
       } else {

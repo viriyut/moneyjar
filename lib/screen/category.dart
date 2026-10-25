@@ -21,21 +21,27 @@ class _CategoryScreenState extends State<CategoryScreen> {
   int _viewMode = 0; // 0 = หน้าเลือกประเภท, 1 = รายจ่าย, 2 = รายรับ
   int _expenseTab = 0; // 0 = จำเป็น, 1 = ส่วนตัว
 
+  // 📌 ชื่อหมวดหมู่ต้องมีคำสำคัญที่ตรงกับ kEssentialKeywords / kPersonalKeywords ใน home.dart
+  // ไม่งั้นรายการจะไม่ถูกนับเข้างบของกลุ่มนั้น
   final List<Map<String, dynamic>> _needsCategories = [
-    {'name': 'อาหารหลัก', 'icon': Icons.restaurant_menu},
-    {'name': 'ที่อยู่อาศัย', 'icon': Icons.home_outlined},
-    {'name': 'เดินทาง', 'icon': Icons.directions_bus},
-    {'name': 'สุขภาพ/ยา', 'icon': Icons.medical_services_outlined},
-    {'name': 'ของใช้จำเป็น', 'icon': Icons.shopping_bag_outlined},
-    {'name': 'ชำระหนี้สิน', 'icon': Icons.credit_card_outlined},
+    {'name': 'ค่าอาหาร/เครื่องดื่ม', 'icon': Icons.restaurant_menu},
+    {'name': 'ค่าผ่อนบ้าน/ค่าเช่า', 'icon': Icons.home_outlined},
+    {'name': 'ค่าน้ำ-ไฟ-เน็ต', 'icon': Icons.receipt_long_outlined},
+    {'name': 'ค่าผ่อนรถ', 'icon': Icons.directions_car_outlined},
+    {'name': 'ค่าเดินทาง', 'icon': Icons.directions_bus},
+    {'name': 'ค่าประกัน', 'icon': Icons.verified_user_outlined},
+    {'name': 'ค่ารักษา/ยา', 'icon': Icons.medical_services_outlined},
+    {'name': 'ค่าของใช้จำเป็น', 'icon': Icons.shopping_bag_outlined},
+    {'name': 'ค่าบัตรเครดิต', 'icon': Icons.credit_card_outlined},
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
   ];
 
   final List<Map<String, dynamic>> _wantsCategories = [
-    {'name': 'คาเฟ่/ชาไข่มุก', 'icon': Icons.local_cafe_outlined},
+    {'name': 'เครื่องดื่ม/ขนม', 'icon': Icons.local_cafe_outlined},
     {'name': 'ช้อปปิ้ง', 'icon': Icons.checkroom_outlined},
     {'name': 'ความบันเทิง', 'icon': Icons.confirmation_number_outlined},
     {'name': 'ท่องเที่ยว', 'icon': Icons.flight_takeoff_outlined},
+    {'name': 'ทำบุญ', 'icon': Icons.volunteer_activism_outlined},
     {'name': 'สัตว์เลี้ยง', 'icon': Icons.pets},
     {'name': 'ของขวัญ', 'icon': Icons.card_giftcard},
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
@@ -43,8 +49,19 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   final List<Map<String, dynamic>> _incomeCategories = [
     {'name': 'เงินเดือน', 'icon': Icons.payments_outlined},
+    {'name': 'พาร์ทไทม์/ฟรีแลนซ์', 'icon': Icons.work_outline},
+    {'name': 'เงินปันผล', 'icon': Icons.trending_up},
+    {'name': 'เงินรางวัล', 'icon': Icons.emoji_events_outlined},
     {'name': 'ของขวัญ', 'icon': Icons.card_giftcard},
+    {'name': 'เพิ่มเติม', 'icon': Icons.add},
+  ];
+
+  // 📌 หมวดเงินออม (แยกเป็นประเภทของตัวเอง ไม่รวมในรายรับ/รายจ่าย)
+  // ชื่อต้องมีคำใน kSavingsKeywords (เงินออม/ลงทุน/กองทุน/ออม) ระบบถึงจะนับเป็นเงินออม
+  final List<Map<String, dynamic>> _savingsCategories = [
     {'name': 'เงินออม', 'icon': Icons.savings_outlined},
+    {'name': 'ลงทุน', 'icon': Icons.trending_up},
+    {'name': 'กองทุน', 'icon': Icons.account_balance_outlined},
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
   ];
 
@@ -110,8 +127,16 @@ class _CategoryScreenState extends State<CategoryScreen> {
                           if (nameController.text.trim().isNotEmpty) {
                             setState(() {
                               // แทรกรายการใหม่ก่อนไอคอน "เพิ่มเติม"
+                              var newName = nameController.text.trim();
+                              // หมวดเงินออมที่ตั้งเอง ต้องมีคำว่า "ออม" ไม่งั้นระบบจะไม่นับเป็นเงินออม
+                              if (identical(categoryList, _savingsCategories) &&
+                                  !kSavingsKeywords.any(
+                                    (kw) => newName.contains(kw),
+                                  )) {
+                                newName = '$newName (ออม)';
+                              }
                               categoryList.insert(categoryList.length - 1, {
-                                'name': nameController.text.trim(),
+                                'name': newName,
                                 'icon': Icons.category_outlined,
                               });
                             });
@@ -369,23 +394,47 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   Widget _buildBodyContent() {
     if (_viewMode == 0) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildActionButton(
-            title: 'เพิ่มรายรับ',
-            icon: Icons.north_east,
-            backgroundColor: const Color(0xFF90CAF9),
-            textColor: Colors.white,
-            onTap: () => setState(() => _viewMode = 2),
+      return Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildActionButton(
+                title: 'รายรับ',
+                icon: Icons.north_east,
+                backgroundColor: const Color(0xFF90CAF9),
+                textColor: Colors.white,
+                onTap: () => setState(() => _viewMode = 2),
+              ),
+              const SizedBox(height: 20),
+              _buildActionButton(
+                title: 'รายจ่าย',
+                icon: Icons.south_east,
+                backgroundColor: const Color(0xFFEE4335),
+                textColor: Colors.white,
+                onTap: () => setState(() => _viewMode = 1),
+              ),
+              const SizedBox(height: 20),
+              _buildActionButton(
+                title: 'เงินออม',
+                icon: Icons.savings_outlined,
+                backgroundColor: const Color(0xFF212121),
+                textColor: Colors.white,
+                onTap: () => setState(() => _viewMode = 3),
+              ),
+            ],
           ),
-          const SizedBox(height: 32),
-          _buildActionButton(
-            title: 'เพิ่มรายจ่าย',
-            icon: Icons.south_east,
-            backgroundColor: const Color(0xFFEE4335),
-            textColor: Colors.white,
-            onTap: () => setState(() => _viewMode = 1),
+        ),
+      );
+    } else if (_viewMode == 3) {
+      return Column(
+        children: [
+          Expanded(
+            child: _buildGridMode(
+              _savingsCategories,
+              const Color(0xFF212121),
+              isIncome: true,
+            ),
           ),
         ],
       );
@@ -393,7 +442,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
       return Column(
         children: [
           _buildExpenseSubTabs(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Expanded(
             child: _buildGridMode(
               _expenseTab == 0 ? _needsCategories : _wantsCategories,
@@ -406,10 +455,16 @@ class _CategoryScreenState extends State<CategoryScreen> {
         ],
       );
     } else {
-      return _buildGridMode(
-        _incomeCategories,
-        const Color(0xFF90CAF9),
-        isIncome: true,
+      return Column(
+        children: [
+          Expanded(
+            child: _buildGridMode(
+              _incomeCategories,
+              const Color(0xFF90CAF9),
+              isIncome: true,
+            ),
+          ),
+        ],
       );
     }
   }
@@ -426,7 +481,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
       borderRadius: BorderRadius.circular(20),
       child: Container(
         width: 220,
-        height: 140,
+        height: 120,
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(20),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firstapp/screen/home.dart' show kSavingsKeywords;
 import 'package:firstapp/screen/notification.dart';
 
 class CalendarPage extends StatefulWidget {
@@ -471,6 +472,9 @@ class _CalendarPageState extends State<CalendarPage> {
   // ---------- แถวรายการธุรกรรม (สไตล์เดียวกับหน้าธุรกรรม) ----------
   Widget _buildTransactionItem(Map<String, dynamic> item) {
     final bool isIncome = item['isIncome'] == true;
+    final bool isSaving = kSavingsKeywords.any(
+      (kw) => ((item['title'] as String?) ?? '').contains(kw),
+    );
     final double amount = (item['amount'] as num?)?.toDouble() ?? 0.0;
     final DateTime dt = item['dateTime'] as DateTime? ?? DateTime.now();
 
@@ -522,12 +526,12 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
           Text(
-            '${isIncome ? '+' : '-'}${amount.toStringAsFixed(2)} THB',
+            '${isSaving ? '' : (isIncome ? '+' : '-')}${amount.toStringAsFixed(2)} THB',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
               color:
-                  isIncome ? const Color(0xFF2E7D32) : const Color(0xFFEF5350),
+                  isSaving ? const Color(0xFF3B97FF) : (isIncome ? const Color(0xFF2E7D32) : const Color(0xFFEF5350)),
             ),
           ),
         ],

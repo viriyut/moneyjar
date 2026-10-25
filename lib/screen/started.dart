@@ -42,7 +42,13 @@ class StartedScreen extends StatelessWidget {
             // ---------- ส่วนล่าง: การ์ดขาวโค้งมน ----------
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(28, 32, 28, 40),
+              // 📌 บวกพื้นที่แถบปุ่มระบบของมือถือ (padding.bottom) ไม่ให้บังปุ่มด้านล่าง
+              padding: EdgeInsets.fromLTRB(
+                28,
+                32,
+                28,
+                40 + MediaQuery.of(context).padding.bottom,
+              ),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(35)),

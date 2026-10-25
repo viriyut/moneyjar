@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firstapp/model/profile.dart';
-import 'package:firstapp/screen/home.dart';
+import 'package:firstapp/screen/tutorial.dart';
 import 'package:flutter/material.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -77,10 +77,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SnackBar(content: Text("สมัครสมาชิกสำเร็จ")),
       );
 
-      // ✅ ย้ายไปหน้า Home และล้าง Navigation Stack
+      // ✅ ย้ายไปหน้า Tutorial (จบแล้วค่อยไป Home) และล้าง Navigation Stack
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(
+          builder: (_) => const TutorialScreen(isFirstTime: true),
+        ),
         (route) => false,
       );
     } on FirebaseAuthException catch (e) {

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:firstapp/screen/notification.dart';
-import 'package:firstapp/screen/searching.dart';
 import 'package:firstapp/screen/calendar.dart';
+import 'package:firstapp/screen/home.dart' show kSavingsKeywords;
+import 'package:firstapp/screen/searching.dart';
+import 'package:firstapp/screen/notification.dart';
 
 class FinancialOverviewPage extends StatefulWidget {
   /// รายการธุรกรรมทั้งหมด ส่งมาจาก HomeScreen
@@ -46,34 +47,19 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
   final List<String> _periods = ["รายวัน", "รายเดือน", "รายปี", "ทั้งหมด"];
 
   static const List<String> _thaiMonthShort = [
-    "ม.ค.",
-    "ก.พ.",
-    "มี.ค.",
-    "เม.ย.",
-    "พ.ค.",
-    "มิ.ย.",
-    "ก.ค.",
-    "ส.ค.",
-    "ก.ย.",
-    "ต.ค.",
-    "พ.ย.",
-    "ธ.ค.",
+    "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+    "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
   ];
 
   static const List<String> _thaiWeekdayShort = [
-    "จ.",
-    "อ.",
-    "พ.",
-    "พฤ.",
-    "ศ.",
-    "ส.",
-    "อา.",
+    "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา.",
   ];
 
   // ---------------- ยอดคงเหลือ (จากธุรกรรมทั้งหมด) ----------------
   double get _totalBalance {
     double total = 0.0;
     for (final tx in widget.transactions) {
+      if (_isSavingTx(tx)) continue; // เงินออมไม่นับรวมในยอดคงเหลือ
       final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
       if (tx['isIncome'] == true) {
         total += amount;
@@ -82,6 +68,12 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       }
     }
     return total;
+  }
+
+  // 📌 รายการเงินออม (หมวด เงินออม/ลงทุน/กองทุน) แยกออกจากรายรับ ไม่รวมเป็นรายรับในกราฟ
+  bool _isSavingTx(Map<String, dynamic> tx) {
+    final title = tx['title'] as String? ?? '';
+    return kSavingsKeywords.any((kw) => title.contains(kw));
   }
 
   DateTime? _dateOf(Map<String, dynamic> tx) {
@@ -116,6 +108,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
 
     final incomeByDay = List<double>.filled(7, 0.0);
     final expenseByDay = List<double>.filled(7, 0.0);
+    final savingByDay = List<double>.filled(7, 0.0);
 
     for (final tx in widget.transactions) {
       final d = _dateOf(tx);
@@ -124,7 +117,9 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       final idx = days.indexWhere((day) => day == dayOnly);
       if (idx == -1) continue;
       final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
-      if (tx['isIncome'] == true) {
+      if (_isSavingTx(tx)) {
+        savingByDay[idx] += amount;
+      } else if (tx['isIncome'] == true) {
         incomeByDay[idx] += amount;
       } else {
         expenseByDay[idx] += amount;
@@ -135,6 +130,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       labels: _thaiWeekdayShort,
       income: incomeByDay,
       expense: expenseByDay,
+      saving: savingByDay,
     );
   }
 
@@ -144,6 +140,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
 
     final incomeByWeek = List<double>.filled(weekCount, 0.0);
     final expenseByWeek = List<double>.filled(weekCount, 0.0);
+    final savingByWeek = List<double>.filled(weekCount, 0.0);
 
     for (final tx in widget.transactions) {
       final d = _dateOf(tx);
@@ -151,7 +148,9 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       if (d.year != now.year || d.month != now.month) continue;
       final weekIdx = ((d.day - 1) ~/ 7).clamp(0, weekCount - 1);
       final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
-      if (tx['isIncome'] == true) {
+      if (_isSavingTx(tx)) {
+        savingByWeek[weekIdx] += amount;
+      } else if (tx['isIncome'] == true) {
         incomeByWeek[weekIdx] += amount;
       } else {
         expenseByWeek[weekIdx] += amount;
@@ -164,12 +163,14 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       labels: labels,
       income: incomeByWeek,
       expense: expenseByWeek,
+      saving: savingByWeek,
     );
   }
 
   _PeriodResult _buildYearly(DateTime now) {
     final incomeByMonth = List<double>.filled(12, 0.0);
     final expenseByMonth = List<double>.filled(12, 0.0);
+    final savingByMonth = List<double>.filled(12, 0.0);
 
     for (final tx in widget.transactions) {
       final d = _dateOf(tx);
@@ -177,7 +178,9 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       if (d.year != now.year) continue;
       final idx = d.month - 1;
       final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
-      if (tx['isIncome'] == true) {
+      if (_isSavingTx(tx)) {
+        savingByMonth[idx] += amount;
+      } else if (tx['isIncome'] == true) {
         incomeByMonth[idx] += amount;
       } else {
         expenseByMonth[idx] += amount;
@@ -190,13 +193,19 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       labels: _thaiMonthShort,
       income: incomeByMonth,
       expense: expenseByMonth,
+      saving: savingByMonth,
     );
   }
 
   _PeriodResult _buildAllTime() {
     if (widget.transactions.isEmpty) {
       final year = DateTime.now().year.toString();
-      return _PeriodResult(labels: [year], income: [0.0], expense: [0.0]);
+      return _PeriodResult(
+        labels: [year],
+        income: [0.0],
+        expense: [0.0],
+        saving: [0.0],
+      );
     }
 
     final years = <int>{};
@@ -208,6 +217,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
 
     final incomeByYear = List<double>.filled(sortedYears.length, 0.0);
     final expenseByYear = List<double>.filled(sortedYears.length, 0.0);
+    final savingByYear = List<double>.filled(sortedYears.length, 0.0);
 
     for (final tx in widget.transactions) {
       final d = _dateOf(tx);
@@ -215,7 +225,9 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       final idx = sortedYears.indexOf(d.year);
       if (idx == -1) continue;
       final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
-      if (tx['isIncome'] == true) {
+      if (_isSavingTx(tx)) {
+        savingByYear[idx] += amount;
+      } else if (tx['isIncome'] == true) {
         incomeByYear[idx] += amount;
       } else {
         expenseByYear[idx] += amount;
@@ -226,6 +238,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
       labels: sortedYears.map((y) => y.toString()).toList(),
       income: incomeByYear,
       expense: expenseByYear,
+      saving: savingByYear,
     );
   }
 
@@ -265,10 +278,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
           children: [
             // --- Header & App Bar (สไตล์เดียวกับหน้าหลัก) ---
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: SizedBox(
                 height: 40,
                 child: Stack(
@@ -346,11 +356,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
-                      Icon(
-                        Icons.north_east,
-                        size: 14,
-                        color: Color(0xFF1E3323),
-                      ),
+                      Icon(Icons.north_east, size: 14, color: Color(0xFF1E3323)),
                       SizedBox(width: 4),
                       Text(
                         "ยอดคงเหลือ",
@@ -437,9 +443,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFFA2E0B2)
-                      : Colors.transparent,
+                  color: isSelected ? const Color(0xFFA2E0B2) : Colors.transparent,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
@@ -447,9 +451,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     color: const Color(0xFF1E3323),
                   ),
                 ),
@@ -468,6 +470,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
     final rawMax = [
       ...result.income,
       ...result.expense,
+      ...result.saving,
     ].fold<double>(0.0, (prev, v) => v > prev ? v : prev);
     final maxYValue = _niceMaxY(rawMax);
 
@@ -494,17 +497,12 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                   IconButton(
                     constraints: const BoxConstraints(),
                     padding: const EdgeInsets.all(4),
-                    icon: const Icon(
-                      Icons.search,
-                      size: 20,
-                      color: Color(0xFF1E3323),
-                    ),
+                    icon: const Icon(Icons.search, size: 20, color: Color(0xFF1E3323)),
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              SearchScreen(transactions: widget.transactions),
+                          builder: (context) => SearchScreen(transactions: widget.transactions),
                         ),
                       );
                     },
@@ -513,18 +511,12 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                   IconButton(
                     constraints: const BoxConstraints(),
                     padding: const EdgeInsets.all(4),
-                    icon: const Icon(
-                      Icons.calendar_today_outlined,
-                      size: 18,
-                      color: Color(0xFF1E3323),
-                    ),
+                    icon: const Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF1E3323)),
                     onPressed: () {
-                      // 📌 ลิ้งก์เปิดไปหน้าปฏิทิน
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              CalendarPage(transactions: widget.transactions),
+                          builder: (context) => CalendarPage(transactions: widget.transactions),
                         ),
                       );
                     },
@@ -541,6 +533,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                   result.labels,
                   result.income,
                   result.expense,
+                  result.saving,
                   maxYValue,
                 ),
         ],
@@ -553,11 +546,12 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
     List<String> labels,
     List<double> income,
     List<double> expense,
+    List<double> saving,
     double maxY,
   ) {
     final chartData = List.generate(
       labels.length,
-      (i) => _makeGroupData(i, income[i], expense[i]),
+      (i) => _makeGroupData(i, income[i], expense[i], saving[i]),
     );
 
     return SizedBox(
@@ -576,12 +570,8 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                 barTouchData: BarTouchData(enabled: false),
                 titlesData: FlTitlesData(
                   show: true,
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -591,18 +581,12 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                         if (value >= 1000) {
                           return Text(
                             "${(value / 1000).toStringAsFixed(0)}k",
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey,
-                            ),
+                            style: const TextStyle(fontSize: 10, color: Colors.grey),
                           );
                         }
                         return Text(
                           value.toInt().toString(),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey,
-                          ),
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
                         );
                       },
                     ),
@@ -617,10 +601,7 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                             padding: const EdgeInsets.only(top: 6.0),
                             child: Text(
                               labels[index],
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF1E3323),
-                              ),
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF1E3323)),
                             ),
                           );
                         }
@@ -662,19 +643,26 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
           final qLabels = result.labels.sublist(start, start + groupSize);
           final qIncome = result.income.sublist(start, start + groupSize);
           final qExpense = result.expense.sublist(start, start + groupSize);
+          final qSaving = result.saving.sublist(start, start + groupSize);
           final rawMax = [
             ...qIncome,
             ...qExpense,
+            ...qSaving,
           ].fold<double>(0.0, (prev, v) => v > prev ? v : prev);
           final maxY = _niceMaxY(rawMax);
-          return _buildBarChart(qLabels, qIncome, qExpense, maxY);
+          return _buildBarChart(qLabels, qIncome, qExpense, qSaving, maxY);
         },
       ),
     );
   }
 
-  // ฟังก์ชันสร้างแท่งคู่ (เขียว = รายรับ, แดง = รายจ่าย)
-  BarChartGroupData _makeGroupData(int x, double income, double expense) {
+  // ฟังก์ชันสร้างแท่ง (เขียว = รายรับ, แดง = รายจ่าย, น้ำเงิน = เงินออม)
+  BarChartGroupData _makeGroupData(
+    int x,
+    double income,
+    double expense,
+    double saving,
+  ) {
     return BarChartGroupData(
       x: x,
       barRods: [
@@ -692,6 +680,13 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
             width: 6,
             borderRadius: BorderRadius.circular(4),
           ),
+        if (saving > 0)
+          BarChartRodData(
+            toY: saving,
+            color: const Color(0xFF3B97FF),
+            width: 6,
+            borderRadius: BorderRadius.circular(4),
+          ),
       ],
     );
   }
@@ -701,9 +696,11 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
     final result = _buildPeriodResult();
     final totalIncome = result.income.fold<double>(0.0, (a, b) => a + b);
     final totalExpense = result.expense.fold<double>(0.0, (a, b) => a + b);
+    final totalSaving = result.saving.fold<double>(0.0, (a, b) => a + b);
 
     final incomeText = "${totalIncome.toStringAsFixed(2)} THB";
     final expenseText = "${totalExpense.toStringAsFixed(2)} THB";
+    final savingText = "${totalSaving.toStringAsFixed(2)} THB";
 
     return Row(
       children: [
@@ -717,24 +714,14 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                   color: const Color(0xFFE8F5EC),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.north_east,
-                  color: Color(0xFF73D193),
-                  size: 20,
-                ),
+                child: const Icon(Icons.north_east, color: Color(0xFF73D193), size: 20),
               ),
               const SizedBox(height: 6),
-              const Text(
-                "รายรับ",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
+              const Text("รายรับ", style: TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 2),
               Text(
                 incomeText,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
             ],
           ),
@@ -750,23 +737,39 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
                   color: const Color(0xFFFDE8E8),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.south_east,
-                  color: Color(0xFFE55345),
-                  size: 20,
-                ),
+                child: const Icon(Icons.south_east, color: Color(0xFFE55345), size: 20),
               ),
               const SizedBox(height: 6),
-              const Text(
-                "รายจ่าย",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
+              const Text("รายจ่าย", style: TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 2),
               Text(
                 expenseText,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+
+        // เงินออม (แยกจากรายรับ)
+        Expanded(
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEBF4FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.savings_outlined, color: Color(0xFF3B97FF), size: 20),
+              ),
+              const SizedBox(height: 6),
+              const Text("เงินออม", style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  savingText,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ),
             ],
@@ -782,10 +785,12 @@ class _PeriodResult {
   final List<String> labels;
   final List<double> income;
   final List<double> expense;
+  final List<double> saving; // เงินออม (แยกจากรายรับ)
 
   const _PeriodResult({
     required this.labels,
     required this.income,
     required this.expense,
+    required this.saving,
   });
 }
