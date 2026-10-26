@@ -219,7 +219,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     maxLength: 60,
                     textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
-                      hintText: 'รายละเอียด (ไม่บังคับ) เช่น ข้าวเหนียวหมูปิ้ง',
+                      hintText: 'รายละเอียด (ไม่บังคับ)',
                       filled: true,
                       fillColor: const Color(0xFFE8F5E9),
                       border: OutlineInputBorder(
