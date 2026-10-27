@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firstapp/screen/home.dart';
 import 'package:firstapp/screen/notification.dart';
 import 'package:flutter/material.dart';
@@ -18,12 +20,14 @@ class CategoryScreen extends StatefulWidget {
 }
 
 class _CategoryScreenState extends State<CategoryScreen> {
-  int _viewMode = 0; // 0 = หน้าเลือกประเภท, 1 = รายจ่าย, 2 = รายรับ
+  int _viewMode = 0; // 0 = หน้าเลือกประเภท, 1 = รายจ่าย, 2 = รายรับ, 3 = เงินออม
   int _expenseTab = 0; // 0 = จำเป็น, 1 = ส่วนตัว
 
+  // 📌 รายการหมวดเป็น static เพื่อให้ทุกสำเนาของหน้านี้ (แท็บล่าง + หน้าที่เปิดจากปุ่ม +)
+  // ใช้รายการชุดเดียวกัน หมวดที่เพิ่มจากที่ไหนก็เห็นทั้งสองที่
   // 📌 ชื่อหมวดหมู่ต้องมีคำสำคัญที่ตรงกับ kEssentialKeywords / kPersonalKeywords ใน home.dart
   // ไม่งั้นรายการจะไม่ถูกนับเข้างบของกลุ่มนั้น
-  final List<Map<String, dynamic>> _needsCategories = [
+  static final List<Map<String, dynamic>> _needsCategories = [
     {'name': 'ค่าอาหาร/เครื่องดื่ม', 'icon': Icons.restaurant_menu},
     {'name': 'ค่าผ่อนบ้าน/ค่าเช่า', 'icon': Icons.home_outlined},
     {'name': 'ค่าน้ำ-ไฟ-เน็ต', 'icon': Icons.receipt_long_outlined},
@@ -36,7 +40,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
   ];
 
-  final List<Map<String, dynamic>> _wantsCategories = [
+  static final List<Map<String, dynamic>> _wantsCategories = [
     {'name': 'เครื่องดื่ม/ขนม', 'icon': Icons.local_cafe_outlined},
     {'name': 'ช้อปปิ้ง', 'icon': Icons.checkroom_outlined},
     {'name': 'ความบันเทิง', 'icon': Icons.confirmation_number_outlined},
@@ -47,7 +51,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
   ];
 
-  final List<Map<String, dynamic>> _incomeCategories = [
+  static final List<Map<String, dynamic>> _incomeCategories = [
     {'name': 'เงินเดือน', 'icon': Icons.payments_outlined},
     {'name': 'พาร์ทไทม์/ฟรีแลนซ์', 'icon': Icons.work_outline},
     {'name': 'เงินปันผล', 'icon': Icons.trending_up},
@@ -58,14 +62,116 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   // 📌 หมวดเงินออม (แยกเป็นประเภทของตัวเอง ไม่รวมในรายรับ/รายจ่าย)
   // ชื่อต้องมีคำใน kSavingsKeywords (เงินออม/ลงทุน/กองทุน/ออม) ระบบถึงจะนับเป็นเงินออม
-  final List<Map<String, dynamic>> _savingsCategories = [
+  static final List<Map<String, dynamic>> _savingsCategories = [
     {'name': 'เงินออม', 'icon': Icons.savings_outlined},
     {'name': 'ลงทุน', 'icon': Icons.trending_up},
     {'name': 'กองทุน', 'icon': Icons.account_balance_outlined},
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
   ];
 
-    // 📌 หมวดที่ตั้งเอง ต้องถูกนับเข้ากลุ่มที่เพิ่มหมวดไว้ (จำเป็น / ส่วนตัว / เงินออม)
+  // ============================================================
+  // 📌 เก็บหมวดที่ผู้ใช้เพิ่มเองไว้ใน Firestore (users/{uid}.customCategories)
+  //    เก็บเฉพาะชื่อหมวด แยกตามกลุ่ม: needs / wants / income / savings
+  //    โหลดครั้งเดียวต่อบัญชี (ทุกสำเนาของหน้านี้รอผลโหลดชุดเดียวกัน)
+  // ============================================================
+  static String? _loadedUid; // บัญชีที่โหลดหมวดไว้แล้ว (เปลี่ยนบัญชี -> โหลดใหม่)
+  static Future<void>? _loadFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureLoaded();
+  }
+
+  Future<void> _ensureLoaded() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    if (_loadedUid != uid) {
+      _loadedUid = uid;
+      _loadFuture = _loadCustomCategories(uid);
+    }
+    await _loadFuture;
+    if (mounted) setState(() {});
+  }
+
+  static Future<void> _loadCustomCategories(String uid) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      final raw = doc.data()?['customCategories'];
+      final Map<String, dynamic> saved =
+          raw is Map ? Map<String, dynamic>.from(raw) : {};
+
+      // ล้างหมวดที่เพิ่มเองของบัญชีก่อนหน้า (ถ้ามี) แล้วใส่หมวดของบัญชีนี้แทน
+      void fill(List<Map<String, dynamic>> list, String key) {
+        list.removeWhere((c) => c['custom'] == true);
+        final names = saved[key];
+        if (names is! List) return;
+        for (final n in names) {
+          if (n is! String || n.isEmpty) continue;
+          if (list.any((c) => c['name'] == n)) continue;
+          list.insert(list.length - 1, {
+            'name': n,
+            'icon': Icons.category_outlined,
+            'custom': true,
+          });
+        }
+      }
+
+      fill(_needsCategories, 'needs');
+      fill(_wantsCategories, 'wants');
+      fill(_incomeCategories, 'income');
+      fill(_savingsCategories, 'savings');
+    } catch (_) {
+      // โหลดไม่สำเร็จ (เช่น ไม่มีเน็ต) ให้ลองโหลดใหม่ตอนเปิดหน้านี้ครั้งหน้า
+      _loadedUid = null;
+    }
+  }
+
+  // บันทึกหมวดที่เพิ่มเองทั้งหมดลง Firestore (เรียกทุกครั้งที่เพิ่ม/แก้ไข/ลบ)
+  Future<void> _saveCustomCategories() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    // ถ้ายังโหลดหมวดเดิมไม่เสร็จ ให้รอก่อน กันเขียนทับข้อมูลเดิมด้วยรายการที่ยังไม่ครบ
+    if (_loadedUid == uid) {
+      await _loadFuture;
+    } else {
+      await _ensureLoaded();
+    }
+    if (_loadedUid != uid) {
+      _showSnack('บันทึกหมวดหมู่ไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
+      return;
+    }
+
+    List<String> namesOf(List<Map<String, dynamic>> list) => list
+        .where((c) => c['custom'] == true)
+        .map((c) => c['name'] as String)
+        .toList();
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'customCategories': {
+          'needs': namesOf(_needsCategories),
+          'wants': namesOf(_wantsCategories),
+          'income': namesOf(_incomeCategories),
+          'savings': namesOf(_savingsCategories),
+        },
+      }, SetOptions(merge: true));
+    } catch (_) {
+      _showSnack('บันทึกหมวดหมู่ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // 📌 หมวดที่ตั้งเอง ต้องถูกนับเข้ากลุ่มที่เพิ่มหมวดไว้ (จำเป็น / ส่วนตัว / เงินออม)
   // ถ้าชื่อที่ตั้งไม่มีคำที่ระบบรู้จักว่าอยู่กลุ่มนั้น จะเติมป้ายท้ายชื่อให้อัตโนมัติ
   // เช่น "ค่าสมาชิกยิม" ในกลุ่มส่วนตัว -> "ค่าสมาชิกยิม (ส่วนตัว)"
   // หมวดรายรับไม่ต้องจัดกลุ่ม คืนชื่อเดิม
@@ -207,6 +313,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                     );
                                   }
                                 });
+                                _saveCustomCategories();
                                 Navigator.pop(ctx);
                               },
                               child: Text(
@@ -228,6 +335,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                             );
                             if (ok != true) return;
                             setState(() => categoryList.remove(existing));
+                            _saveCustomCategories();
                             if (ctx.mounted) Navigator.pop(ctx);
                           },
                           icon: const Icon(
