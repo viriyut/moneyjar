@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firstapp/screen/transaction_model.dart';
-import 'package:firstapp/screen/home.dart'
-    show kEssentialKeywords, kPersonalKeywords, kSavingsKeywords;
+import 'package:firstapp/screen/home.dart' 
+        show groupOfTitle, kSavingsKeywords;
 import 'package:firstapp/screen/notification.dart';
 import 'category.dart';
 
@@ -97,15 +97,19 @@ class _TransactionScreenState extends State<TransactionScreen> {
       final String title = tx['title'] as String? ?? '';
       final double amount = (tx['amount'] as num).toDouble();
 
-      final String key;
-      if (kEssentialKeywords.any((kw) => title.contains(kw))) {
-        key = 'จำเป็น';
-      } else if (kPersonalKeywords.any((kw) => title.contains(kw))) {
-        key = 'ส่วนตัว';
-      } else if (kSavingsKeywords.any((kw) => title.contains(kw))) {
-        key = 'เงินออม';
-      } else {
-        key = 'อื่นๆ';
+            final String key;
+      switch (groupOfTitle(title)) {
+        case 'essential':
+          key = 'จำเป็น';
+          break;
+        case 'personal':
+          key = 'ส่วนตัว';
+          break;
+        case 'savings':
+          key = 'เงินออม';
+          break;
+        default:
+          key = 'อื่นๆ';
       }
 
       groups[key]!['count'] = (groups[key]!['count'] as int) + 1;
@@ -237,7 +241,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${(totalIncome - totalExpense).toStringAsFixed(2)} THB',
+                              '${(totalIncome - totalExpense - totalSavings).toStringAsFixed(2)} THB',
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,

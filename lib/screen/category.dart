@@ -65,97 +65,281 @@ class _CategoryScreenState extends State<CategoryScreen> {
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
   ];
 
-  // 📌 ป๊อปอัปเพิ่มหมวดหมู่ใหม่เมื่อกดปุ่ม "เพิ่มเติม"
-  void _showAddNewCategoryDialog(List<Map<String, dynamic>> categoryList) {
-    final TextEditingController nameController = TextEditingController();
+    // 📌 หมวดที่ตั้งเอง ต้องถูกนับเข้ากลุ่มที่เพิ่มหมวดไว้ (จำเป็น / ส่วนตัว / เงินออม)
+  // ถ้าชื่อที่ตั้งไม่มีคำที่ระบบรู้จักว่าอยู่กลุ่มนั้น จะเติมป้ายท้ายชื่อให้อัตโนมัติ
+  // เช่น "ค่าสมาชิกยิม" ในกลุ่มส่วนตัว -> "ค่าสมาชิกยิม (ส่วนตัว)"
+  // หมวดรายรับไม่ต้องจัดกลุ่ม คืนชื่อเดิม
+  String _normalizeName(List<Map<String, dynamic>> categoryList, String name) {
+    final String group;
+    final String tag;
+    if (identical(categoryList, _needsCategories)) {
+      group = 'essential';
+      tag = kEssentialTag;
+    } else if (identical(categoryList, _wantsCategories)) {
+      group = 'personal';
+      tag = kPersonalTag;
+    } else if (identical(categoryList, _savingsCategories)) {
+      group = 'savings';
+      tag = kSavingsTag;
+    } else {
+      return name;
+    }
+
+    if (groupOfTitle(name) == group) return name;
+    return '$name $tag';
+  }
+
+  // 📌 ป๊อปอัปเพิ่มหมวดหมู่ใหม่ (กดปุ่ม "เพิ่มเติม")
+  //    หรือแก้ไข/ลบหมวดหมู่ที่เพิ่มเอง (กดค้างที่หมวดนั้น) เมื่อส่ง existing เข้ามา
+  void _showCategoryDialog(
+    List<Map<String, dynamic>> categoryList, {
+    Map<String, dynamic>? existing,
+  }) {
+    final TextEditingController nameController = TextEditingController(
+      text: (existing?['name'] as String?) ?? '',
+    );
+    String? errorText;
 
     showDialog(
       context: context,
       builder: (ctx) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'เพิ่มหมวดหมู่ใหม่',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E3323),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameController,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: 'ชื่อหมวดหมู่',
-                    filled: true,
-                    fillColor: const Color(0xFFE8F5E9),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text(
-                          'ยกเลิก',
-                          style: TextStyle(color: Colors.grey),
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        existing == null ? 'เพิ่มหมวดหมู่ใหม่' : 'แก้ไขหมวดหมู่',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E3323),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFA2E0B2),
-                          shape: RoundedRectangleBorder(
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: nameController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'ชื่อหมวดหมู่',
+                          errorText: errorText,
+                          filled: true,
+                          fillColor: const Color(0xFFE8F5E9),
+                          border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
                           ),
                         ),
-                        onPressed: () {
-                          if (nameController.text.trim().isNotEmpty) {
-                            setState(() {
-                              // แทรกรายการใหม่ก่อนไอคอน "เพิ่มเติม"
-                              var newName = nameController.text.trim();
-                              // หมวดเงินออมที่ตั้งเอง ต้องมีคำว่า "ออม" ไม่งั้นระบบจะไม่นับเป็นเงินออม
-                              if (identical(categoryList, _savingsCategories) &&
-                                  !kSavingsKeywords.any(
-                                    (kw) => newName.contains(kw),
-                                  )) {
-                                newName = '$newName (ออม)';
-                              }
-                              categoryList.insert(categoryList.length - 1, {
-                                'name': newName,
-                                'icon': Icons.category_outlined,
-                              });
-                            });
-                            Navigator.pop(ctx);
+                        onChanged: (_) {
+                          if (errorText != null) {
+                            setDialogState(() => errorText = null);
                           }
                         },
-                        child: const Text(
-                          'ตกลง',
-                          style: TextStyle(color: Color(0xFF1E3323)),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text(
+                                'ยกเลิก',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFA2E0B2),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              onPressed: () {
+                                final raw = nameController.text.trim();
+                                if (raw.isEmpty) {
+                                  setDialogState(
+                                    () => errorText = 'กรุณากรอกชื่อหมวดหมู่',
+                                  );
+                                  return;
+                                }
+
+                                final newName = _normalizeName(
+                                  categoryList,
+                                  raw,
+                                );
+
+                                // ห้ามชื่อซ้ำกับหมวดอื่นในหน้าเดียวกัน (และห้ามใช้ชื่อ "เพิ่มเติม")
+                                final bool duplicated =
+                                    newName == 'เพิ่มเติม' ||
+                                    categoryList.any(
+                                      (c) =>
+                                          !identical(c, existing) &&
+                                          c['name'] == newName,
+                                    );
+                                if (duplicated) {
+                                  setDialogState(
+                                    () => errorText = 'มีหมวดหมู่ชื่อนี้อยู่แล้ว',
+                                  );
+                                  return;
+                                }
+
+                                setState(() {
+                                  if (existing != null) {
+                                    existing['name'] = newName;
+                                  } else {
+                                    // แทรกรายการใหม่ก่อนไอคอน "เพิ่มเติม"
+                                    categoryList.insert(
+                                      categoryList.length - 1,
+                                      {
+                                        'name': newName,
+                                        'icon': Icons.category_outlined,
+                                        'custom': true,
+                                      },
+                                    );
+                                  }
+                                });
+                                Navigator.pop(ctx);
+                              },
+                              child: Text(
+                                existing == null ? 'ตกลง' : 'บันทึก',
+                                style: const TextStyle(
+                                  color: Color(0xFF1E3323),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // ปุ่มลบ แสดงเฉพาะตอนแก้ไขหมวดที่เพิ่มเอง
+                      if (existing != null)
+                        TextButton.icon(
+                          onPressed: () async {
+                            final ok = await _confirmDeleteCategory(
+                              existing['name'] as String,
+                            );
+                            if (ok != true) return;
+                            setState(() => categoryList.remove(existing));
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          },
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: Color(0xFFEE4E4E),
+                          ),
+                          label: const Text(
+                            'ลบหมวดหมู่นี้',
+                            style: TextStyle(color: Color(0xFFEE4E4E)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 📌 หน้าต่างยืนยันก่อนลบหมวดหมู่ (คืน true ถ้ายืนยัน)
+  Future<bool?> _confirmDeleteCategory(String name) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFDE8E8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_outline,
+                  color: Color(0xFFEE4E4E),
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'ลบหมวดหมู่',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E3323),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'ต้องการลบหมวด "$name" ใช่ไหม?\nรายการที่เคยบันทึกไว้จะไม่ถูกลบ',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        side: const BorderSide(color: Color(0xFF1E3323)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text(
+                        'ยกเลิก',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E3323),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: const Color(0xFFEE4E4E),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        'ลบ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -571,58 +755,106 @@ class _CategoryScreenState extends State<CategoryScreen> {
     Color cardColor, {
     required bool isIncome,
   }) {
-    return GridView.builder(
-      physics: const BouncingScrollPhysics(),
-      itemCount: categories.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 20,
-      ),
-      itemBuilder: (context, index) {
-        final item = categories[index];
-        return InkWell(
-          onTap: () {
-            if (item['name'] == 'เพิ่มเติม') {
-              _showAddNewCategoryDialog(categories);
-            } else {
-              _showAddAmountDialog(
-                context,
-                title: item['name'],
-                icon: item['icon'],
-                cardColor: cardColor,
-                isIncome: isIncome,
-              );
-            }
-          },
-          child: Column(
-            children: [
-              Container(
-                width: 65,
-                height: 65,
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  item['icon'] as IconData,
-                  size: 32,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                item['name'] as String,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+    final bool hasCustom = categories.any((c) => c['custom'] == true);
+
+    return Column(
+      children: [
+        // 📌 คำใบ้วิธีแก้ไข/ลบ แสดงเมื่อมีหมวดที่เพิ่มเองอยู่ในหน้านี้
+        if (hasCustom)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text(
+              'กดค้างที่หมวดที่มีไอคอนดินสอ เพื่อแก้ไขหรือลบ',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
           ),
-        );
-      },
+        Expanded(
+          child: GridView.builder(
+            physics: const BouncingScrollPhysics(),
+            itemCount: categories.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 20,
+            ),
+            itemBuilder: (context, index) {
+              final item = categories[index];
+              final bool isCustom = item['custom'] == true;
+              return InkWell(
+                onTap: () {
+                  if (item['name'] == 'เพิ่มเติม') {
+                    _showCategoryDialog(categories);
+                  } else {
+                    _showAddAmountDialog(
+                      context,
+                      title: item['name'],
+                      icon: item['icon'],
+                      cardColor: cardColor,
+                      isIncome: isIncome,
+                    );
+                  }
+                },
+                // 📌 กดค้างเพื่อแก้ไข/ลบ (เฉพาะหมวดที่ผู้ใช้เพิ่มเอง)
+                onLongPress: isCustom
+                    ? () => _showCategoryDialog(categories, existing: item)
+                    : null,
+                child: Column(
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 65,
+                          height: 65,
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(
+                            item['icon'] as IconData,
+                            size: 32,
+                            color: Colors.white,
+                          ),
+                        ),
+                        if (isCustom)
+                          Positioned(
+                            top: -4,
+                            right: -4,
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFFE0E0E0),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.edit,
+                                size: 12,
+                                color: Color(0xFF1E3323),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item['name'] as String,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

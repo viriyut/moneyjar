@@ -39,6 +39,7 @@ const List<String> kEssentialKeywords = [
   'ประกัน',
   'เช่า',
   'เน็ต',
+  'บัตรเครดิต',
 ];
 
 const List<String> kPersonalKeywords = [
@@ -57,6 +58,29 @@ const List<String> kPersonalKeywords = [
 ];
 
 const List<String> kSavingsKeywords = ['เงินออม', 'ลงทุน', 'กองทุน', 'ออม'];
+
+// ============================================================
+// 📌 ป้ายท้ายชื่อหมวดที่ผู้ใช้เพิ่มเอง (ถ้าชื่อไม่มีคำสำคัญข้างบน)
+// category.dart จะเติมป้ายให้อัตโนมัติ เพื่อให้รายการนับเข้ากลุ่มที่ผู้ใช้เพิ่มหมวดไว้
+// ============================================================
+const String kEssentialTag = '(จำเป็น)';
+const String kPersonalTag = '(ส่วนตัว)';
+const String kSavingsTag = '(ออม)';
+
+// ============================================================
+// 📌 ฟังก์ชันจัดกลุ่มรายการจากชื่อหมวด ใช้ตัวเดียวทั้งแอป
+// คืนค่า 'essential' | 'personal' | 'savings' | 'other'
+// ลำดับ: ป้ายท้ายชื่อ -> เงินออม -> คำสำคัญจำเป็น -> คำสำคัญส่วนตัว
+// (แต่ละรายการนับได้กลุ่มเดียว ไม่นับซ้ำสองกลุ่ม)
+// ============================================================
+String groupOfTitle(String title) {
+  if (title.contains(kEssentialTag)) return 'essential';
+  if (title.contains(kPersonalTag)) return 'personal';
+  if (kSavingsKeywords.any((kw) => title.contains(kw))) return 'savings';
+  if (kEssentialKeywords.any((kw) => title.contains(kw))) return 'essential';
+  if (kPersonalKeywords.any((kw) => title.contains(kw))) return 'personal';
+  return 'other';
+}
 
 // ============================================================
 // 📌 ไอคอนที่ใช้ในหมวดหมู่ทั้งหมด (ต้องเป็น const เพื่อให้ build release ตัดไอคอนที่ไม่ใช้ออกได้)
@@ -239,25 +263,32 @@ class _HomeScreenState extends State<HomeScreen> {
   double get _totalBalance {
     double total = 0.0;
     for (var tx in _transactions) {
-      // เงินออมไม่นับรวมในยอดคงเหลือ
       final title = tx['title'] as String? ?? '';
-      if (kSavingsKeywords.any((kw) => title.contains(kw))) continue;
+      final amount = tx['amount'] as double;
+
+      // เงินออมถือเป็นเงินที่กันออกไป จึงหักออกจากยอดคงเหลือ
+      // (หมวดเงินออมถูกบันทึกเป็น isIncome = true จึงต้องเช็กก่อนและหักเสมอ)
+      if (groupOfTitle(title) == 'savings') {
+        total -= amount;
+        continue;
+      }
+
       if (tx['isIncome'] == true) {
-        total += (tx['amount'] as double);
+        total += amount;
       } else {
-        total -= (tx['amount'] as double);
+        total -= amount;
       }
     }
     return total;
   }
 
-  // 📌 ฟังก์ชันคำนวณยอดใช้จ่ายตาม Keyword (ใช้สำหรับเช็คเงื่อนไขยิง Notification)
-  double _calculateSpentForGroup(List<String> keywords) {
+  // 📌 ฟังก์ชันคำนวณยอดใช้จ่ายของกลุ่ม ('essential' / 'personal') ใช้เช็คเงื่อนไขยิง Notification
+  double _calculateSpentForGroup(String group) {
     return _transactions
         .where(
           (tx) =>
               tx['isIncome'] == false &&
-              keywords.any((kw) => (tx['title'] as String).contains(kw)),
+              groupOfTitle(tx['title'] as String) == group,
         )
         .fold(0.0, (sum, tx) => sum + (tx['amount'] as double));
   }
@@ -401,13 +432,10 @@ class _HomeScreenState extends State<HomeScreen> {
     // ========================================================
     final double essentialBudget = _totalBudget * (_essentialPct / 100);
     if (essentialBudget > 0) {
-      final double currentEssentialSpent = _calculateSpentForGroup(
-        kEssentialKeywords,
-      );
+      final double currentEssentialSpent = _calculateSpentForGroup('essential');
       // หายอดก่อนหน้ารายการนี้ (ถ้ารายการนี้ตรงกับหมวดจำเป็น ให้ลบออกก่อนเช็ค)
-      final bool isEssentialTx = kEssentialKeywords.any(
-        (kw) => tx.title.contains(kw),
-      );
+      final bool isEssentialTx =
+          !tx.isIncome && groupOfTitle(tx.title) == 'essential';
       final double previousEssentialSpent = isEssentialTx
           ? (currentEssentialSpent - tx.amount)
           : currentEssentialSpent;
@@ -444,12 +472,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // ========================================================
     final double personalBudget = _totalBudget * (_personalPct / 100);
     if (personalBudget > 0) {
-      final double currentPersonalSpent = _calculateSpentForGroup(
-        kPersonalKeywords,
-      );
-      final bool isPersonalTx = kPersonalKeywords.any(
-        (kw) => tx.title.contains(kw),
-      );
+      final double currentPersonalSpent = _calculateSpentForGroup('personal');
+      final bool isPersonalTx =
+          !tx.isIncome && groupOfTitle(tx.title) == 'personal';
       final double previousPersonalSpent = isPersonalTx
           ? (currentPersonalSpent - tx.amount)
           : currentPersonalSpent;
@@ -487,16 +512,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final double savingsBudget = _totalBudget * (_savingsPct / 100);
     if (savingsBudget > 0) {
       final double currentSavingsSpent = _transactions
-          .where(
-            (t) => kSavingsKeywords.any(
-              (kw) => (t['title'] as String).contains(kw),
-            ),
-          )
+          .where((t) => groupOfTitle(t['title'] as String) == 'savings')
           .fold(0.0, (sum, t) => sum + (t['amount'] as double));
 
-      final bool isSavingsTx = kSavingsKeywords.any(
-        (kw) => tx.title.contains(kw),
-      );
+      final bool isSavingsTx = groupOfTitle(tx.title) == 'savings';
       final double previousSavingsSpent = isSavingsTx
           ? (currentSavingsSpent - tx.amount)
           : currentSavingsSpent;
@@ -828,13 +847,13 @@ class HomeContent extends StatelessWidget {
     required this.onEditBudget,
   });
 
-  // 📌 ฟังก์ชันแยกคำนวณยอดเงินที่จ่ายไปตามกลุ่มหมวดหมู่
-  double _calculateSpentForGroup(List<String> keywords) {
+  // 📌 ฟังก์ชันแยกคำนวณยอดเงินที่จ่ายไปตามกลุ่มหมวดหมู่ ('essential' / 'personal')
+  double _calculateSpentForGroup(String group) {
     return transactions
         .where(
           (tx) =>
               tx['isIncome'] == false &&
-              keywords.any((kw) => (tx['title'] as String).contains(kw)),
+              groupOfTitle(tx['title'] as String) == group,
         )
         .fold(0.0, (sum, tx) => sum + (tx['amount'] as double));
   }
@@ -847,14 +866,10 @@ class HomeContent extends StatelessWidget {
     final double savingsBudget = totalBudget * (savingsPct / 100);
 
     // 📌 2. คำนวณยอดที่ใช้จ่ายไปจริงในแต่ละกลุ่ม
-    final double essentialSpent = _calculateSpentForGroup(kEssentialKeywords);
-    final double personalSpent = _calculateSpentForGroup(kPersonalKeywords);
+    final double essentialSpent = _calculateSpentForGroup('essential');
+    final double personalSpent = _calculateSpentForGroup('personal');
     final double savingsSpent = transactions
-        .where(
-          (tx) => kSavingsKeywords.any(
-            (kw) => (tx['title'] as String).contains(kw),
-          ),
-        )
+        .where((tx) => groupOfTitle(tx['title'] as String) == 'savings')
         .fold(0.0, (sum, tx) => sum + (tx['amount'] as double));
 
     // 📌 3. คำนวณสัดส่วนสำหรับ Progress Bar (0.0 ถึง 1.0)
@@ -1129,7 +1144,7 @@ class HomeContent extends StatelessWidget {
                         ? Icons.check_circle_outline
                         : Icons.savings_outlined,
                     subText: savingsProgress >= 1.0
-                        ? "ยินดีด้วยคุณสำเร็จ 100% ของเป้าหมายเดือนนี้แล้ว"
+                        ? "ยินดีด้วยคุณสำเร็จ ${(savingsProgress * 100).toStringAsFixed(0)}% ของเป้าหมายเดือนนี้แล้ว"
                         : "ออมไปแล้ว ${(savingsProgress * 100).toStringAsFixed(0)}% ของเป้าหมาย",
                   ),
                 ],

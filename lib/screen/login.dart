@@ -47,6 +47,31 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // 📌 แปลง error ของการส่งอีเมลรีเซ็ตรหัสผ่าน
+  String _mapResetError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+      case 'missing-email':
+        return 'รูปแบบอีเมลไม่ถูกต้อง';
+      case 'user-not-found':
+        return 'ไม่พบบัญชีที่ใช้อีเมลนี้';
+      case 'too-many-requests':
+        return 'ขอรีเซ็ตบ่อยเกินไป กรุณาลองใหม่ภายหลัง';
+      case 'network-request-failed':
+        return 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่';
+      default:
+        return 'ส่งลิงก์รีเซ็ตรหัสผ่านไม่สำเร็จ (${e.code})';
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
+    );
+  }
+
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -83,20 +108,31 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // 📌 ลืมรหัสผ่าน: ส่งลิงก์ตั้งรหัสผ่านใหม่ไปทางอีเมล
   Future<void> _handleForgotPassword() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      setState(() => _errorText = 'กรอกอีเมลก่อน แล้วกด "ลืมรหัสผ่าน?" อีกครั้ง');
+      _showSnack('กรอกอีเมลในช่องด้านบนก่อน แล้วกด "ลืมรหัสผ่าน?" อีกครั้ง');
       return;
     }
+
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ $email แล้ว')),
+      _showSnack(
+        'ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ $email แล้ว\n'
+        'หากไม่พบในกล่องจดหมาย กรุณาตรวจสอบโฟลเดอร์สแปมด้วย',
       );
     } on FirebaseAuthException catch (e) {
-      setState(() => _errorText = _mapAuthError(e));
+      _showSnack(_mapResetError(e));
+    } catch (e) {
+      _showSnack('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -266,21 +302,32 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
 
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 6),
 
+                              // 📌 ปุ่มลืมรหัสผ่าน (ใช้ TextButton ให้พื้นที่กดใหญ่ขึ้น)
                               Center(
-                                child: GestureDetector(
-                                  onTap: _isLoading
-                                      ? null
-                                      : _handleForgotPassword,
+                                child: TextButton(
+                                  onPressed:
+                                      _isLoading ? null : _handleForgotPassword,
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 10,
+                                    ),
+                                  ),
                                   child: const Text(
                                     "ลืมรหัสผ่าน?",
-                                    style: TextStyle(color: Colors.black54),
+                                    style: TextStyle(
+                                      color: Color(0xFF183B2D),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                    ),
                                   ),
                                 ),
                               ),
 
-                              const SizedBox(height: 15),
+                              const SizedBox(height: 9),
 
                               /// ปุ่มสร้างบัญชีใหม่
                               Center(

@@ -56,11 +56,17 @@ class _FinancialOverviewPageState extends State<FinancialOverviewPage> {
   ];
 
   // ---------------- ยอดคงเหลือ (จากธุรกรรมทั้งหมด) ----------------
-  double get _totalBalance {
+    double get _totalBalance {
     double total = 0.0;
     for (final tx in widget.transactions) {
-      if (_isSavingTx(tx)) continue; // เงินออมไม่นับรวมในยอดคงเหลือ
       final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
+
+      // เงินออมถือเป็นเงินที่กันออกไป จึงหักออกจากยอดคงเหลือ
+      if (_isSavingTx(tx)) {
+        total -= amount;
+        continue;
+      }
+
       if (tx['isIncome'] == true) {
         total += amount;
       } else {
