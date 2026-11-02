@@ -113,6 +113,7 @@ final Map<int, IconData> _knownIcons = {
     Icons.trending_up,
     Icons.emoji_events_outlined,
     Icons.account_balance_outlined,
+    Icons.sports_esports_outlined,
   ])
     icon.codePoint: icon,
 };

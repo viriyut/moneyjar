@@ -46,7 +46,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     {'name': 'ความบันเทิง', 'icon': Icons.confirmation_number_outlined},
     {'name': 'ท่องเที่ยว', 'icon': Icons.flight_takeoff_outlined},
     {'name': 'ทำบุญ', 'icon': Icons.volunteer_activism_outlined},
-    {'name': 'สัตว์เลี้ยง', 'icon': Icons.pets},
+    {'name': 'เกม', 'icon': Icons.sports_esports_outlined},
     {'name': 'ของขวัญ', 'icon': Icons.card_giftcard},
     {'name': 'เพิ่มเติม', 'icon': Icons.add},
   ];
